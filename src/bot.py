@@ -1,280 +1,297 @@
-"""
-NBABot v10.0 — Main Discord Bot
+# file: bot.py
 
+"""
+NBABot v11 — Main Discord Bot
 NBA Analytics Discord Bot — Rule-Based Parlay Generator
 """
+
+import asyncio
+import os
+import logging
+
+os.environ["NBABOT_VERSION"] = "11"
 
 import discord
 from discord import app_commands
 from discord.ext import commands
-import asyncio
-import logging
-from typing import Optional
+from dotenv import load_dotenv
 
-from config import (
-    DISCORD_TOKEN, GUILD_ID, BOT_NAME, BOT_VERSION,
-    MIN_LEGS, MAX_LEGS, MIN_WAGER, MAX_WAGER,
-    DEFAULT_LADDER, VALID_LADDERS
+from confidence_engine import (
+    calculate_confidence,
+    HitRateData,
+    ContextData,
+    CONFIDENCE_MAX,
 )
-from parlay_engine import parlay_engine
+
 from embeds import (
-    build_parlay_embed, build_help_embed, build_rules_embed,
-    build_error_embed, build_no_games_embed, build_not_enough_legs_embed
+    build_potd_embed_v11,
+    build_edge_finder_embed_v11,
+    build_parlay_embed,
 )
+
 from buttons import ParlayView
-from api_client import api_client
+from parlay_engine import parlay_engine, Parlay, generate_parlay_id
+from startup_checks import verify_v11
+from startup_checks_player_status import verify_player_status_engine
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(BOT_NAME)
+# ----------------- SETUP -----------------
 
+logging.basicConfig(level=logging.INFO)
 
-class NBABot(commands.Bot):
-    """
-    Main Discord bot class.
-    """
-    
-    def __init__(self):
-        intents = discord.Intents.default()
-        intents.message_content = True
-        
-        super().__init__(
-            command_prefix="!",
-            intents=intents,
-            description=f"{BOT_NAME} v{BOT_VERSION} — NBA Analytics Bot"
-        )
-    
-    async def setup_hook(self):
-        """Called when the bot is ready to set up commands."""
-        # Add cog with commands
-        await self.add_cog(ParlayCog(self))
-        
-        # Sync commands
-        if GUILD_ID:
-            guild = discord.Object(id=int(GUILD_ID))
-            self.tree.copy_global_to(guild=guild)
-            await self.tree.sync(guild=guild)
-            logger.info(f"Synced commands to guild {GUILD_ID}")
-        else:
-            await self.tree.sync()
-            logger.info("Synced commands globally")
-    
-    async def on_ready(self):
-        """Called when the bot is fully connected."""
-        logger.info(f"{BOT_NAME} v{BOT_VERSION} is online!")
-        logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
-        logger.info(f"Connected to {len(self.guilds)} guild(s)")
-        
-        # Set presence
-        await self.change_presence(
-            activity=discord.Activity(
-                type=discord.ActivityType.watching,
-                name="NBA games 🏀"
-            )
-        )
-    
-    async def close(self):
-        """Clean up when bot shuts down."""
-        await api_client.close()
-        await super().close()
+load_dotenv()
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+if not DISCORD_TOKEN:
+    raise RuntimeError("DISCORD_TOKEN is missing")
 
+POTD_CONFIDENCE_MIN = 70
+DEFAULT_MIN_CONFIDENCE = 60
+
+# ================= COG ==================
 
 class ParlayCog(commands.Cog):
-    """
-    Cog containing all parlay-related commands.
-    """
-    
-    def __init__(self, bot: NBABot):
+    """All parlay-related commands (v11)."""
+
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-    
-    # ==================== MAIN PARLAY COMMAND ====================
-    
+
+    # ---------- PICK OF THE DAY ----------
+
     @app_commands.command(
-        name="parlay",
-        description="Generate a rule-based NBA parlay using historical hit-rate data"
+        name="pickoftheday",
+        description="Get today's highest confidence picks ranked",
     )
-    @app_commands.describe(
-        legs="Number of legs for the parlay (2-10)",
-        wager="Wager amount in USD",
-        ladder="Historical game window for hit-rate calculation (default: 5)"
+    async def pickoftheday(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        try:
+            games = await parlay_engine.api.get_games_today()
+            if not games:
+                await interaction.followup.send("❌ No NBA games today.", ephemeral=True)
+                return
+
+            all_picks = []
+
+            for game in games:
+                legs = await parlay_engine._generate_legs_for_game(game, ladder=5)
+                for leg in legs:
+                    if not leg.eligible:
+                        continue
+
+                    hit_rate = HitRateData(
+                        hits_l5=leg.hit_rate.hits_l5,
+                        games_l5=leg.hit_rate.games_l5,
+                        hits_l10=leg.hit_rate.hits_l10,
+                        games_l10=leg.hit_rate.games_l10,
+                        hits_l15=leg.hit_rate.hits_l15,
+                        games_l15=leg.hit_rate.games_l15,
+                    )
+
+                    context = ContextData(
+                        minutes_stable=leg.minutes_projection.stable,
+                        is_home=leg.is_home,
+                    )
+
+                    confidence = calculate_confidence(hit_rate, context)
+
+                    if confidence.score >= POTD_CONFIDENCE_MIN:
+                        all_picks.append(
+                            {"leg": leg, "confidence": confidence.score}
+                        )
+
+            if not all_picks:
+                await interaction.followup.send("❌ No eligible picks today.", ephemeral=True)
+                return
+
+            all_picks.sort(key=lambda x: x["confidence"], reverse=True)
+            embed = build_potd_embed_v11(all_picks[:5])
+            await interaction.followup.send(embed=embed)
+
+        except Exception:
+            logging.exception("Pick of the Day failed")
+            await interaction.followup.send(
+                "❌ Unexpected error. Please try again later.",
+                ephemeral=True,
+            )
+
+    # ---------- PARLAY CONFIDENCE ----------
+
+    @app_commands.command(
+        name="parlay-confidence",
+        description="Generate parlay with v11 confidence scoring",
     )
-    @app_commands.choices(ladder=[
-        app_commands.Choice(name="5 games", value=5),
-        app_commands.Choice(name="10 games", value=10),
-        app_commands.Choice(name="15 games", value=15),
-    ])
-    async def parlay_command(
+    async def parlay_confidence(
         self,
         interaction: discord.Interaction,
-        legs: app_commands.Range[int, MIN_LEGS, MAX_LEGS],
-        wager: app_commands.Range[float, MIN_WAGER, MAX_WAGER],
-        ladder: Optional[int] = DEFAULT_LADDER
+        legs: int = 4,
+        wager: float = 10.0,
+        ladder: int = 5,
+        min_confidence: int = DEFAULT_MIN_CONFIDENCE,
     ):
-        """
-        Main parlay generation command.
-        
-        Usage: /parlay legs:4 wager:10 ladder:5
-        """
         await interaction.response.defer()
-        
         try:
-            # Generate parlay
-            parlay = await parlay_engine.generate_parlay(
-                legs_count=legs,
+            games = await parlay_engine.api.get_games_today()
+            if not games:
+                await interaction.followup.send("❌ No NBA games today.", ephemeral=True)
+                return
+
+            eligible_legs = []
+
+            for game in games:
+                game_legs = await parlay_engine._generate_legs_for_game(game, ladder)
+                for leg in game_legs:
+                    if not leg.eligible:
+                        continue
+
+                    hit_rate = HitRateData(
+                        hits_l5=leg.hit_rate.hits_l5,
+                        games_l5=leg.hit_rate.games_l5,
+                        hits_l10=leg.hit_rate.hits_l10,
+                        games_l10=leg.hit_rate.games_l10,
+                        hits_l15=leg.hit_rate.hits_l15,
+                        games_l15=leg.hit_rate.games_l15,
+                    )
+
+                    context = ContextData(
+                        minutes_stable=leg.minutes_projection.stable,
+                        is_home=leg.is_home,
+                    )
+
+                    confidence = calculate_confidence(hit_rate, context)
+
+                    if confidence.score >= min_confidence:
+                        leg.confidence = confidence
+                        eligible_legs.append(leg)
+
+            if len(eligible_legs) < legs:
+                await interaction.followup.send(
+                    f"❌ Only {len(eligible_legs)} legs meet criteria.",
+                    ephemeral=True,
+                )
+                return
+
+            eligible_legs.sort(
+                key=lambda l: l.confidence.score, reverse=True
+            )
+            selected = parlay_engine._select_varied_legs(
+                eligible_legs, legs
+            )
+
+            total_decimal = 1.0
+            for leg in selected:
+                total_decimal *= leg.odds.decimal
+
+            parlay = Parlay(
+                id=generate_parlay_id(),
+                legs=selected,
+                leg_count=len(selected),
                 wager=wager,
                 ladder=ladder,
+                total_odds=parlay_engine._decimal_to_american(total_decimal),
+                total_odds_decimal=round(total_decimal, 2),
+                potential_win=round(wager * total_decimal, 2),
+                created_at=None,
                 user_id=str(interaction.user.id),
-                guild_id=str(interaction.guild_id) if interaction.guild_id else None,
-                channel_id=str(interaction.channel_id) if interaction.channel_id else None
+                guild_id=str(interaction.guild_id),
+                channel_id=str(interaction.channel_id),
             )
-            
-            if not parlay:
-                # Check if no games
-                games = await api_client.get_games_today()
-                if not games:
-                    embed = build_no_games_embed()
-                else:
-                    embed = build_not_enough_legs_embed(legs, 0)
-                
-                await interaction.followup.send(embed=embed)
-                return
-            
-            # Build embed and view
-            embed = build_parlay_embed(parlay)
-            view = ParlayView(parlay)
-            
-            await interaction.followup.send(embed=embed, view=view)
-            
-            logger.info(
-                f"Generated parlay {parlay.id} for user {interaction.user.id} "
-                f"({legs} legs, ${wager}, ladder {ladder})"
-            )
-        
-        except Exception as e:
-            logger.error(f"Error generating parlay: {e}", exc_info=True)
-            embed = build_error_embed(
-                "Generation Failed",
-                "An error occurred while generating the parlay. Please try again."
-            )
-            await interaction.followup.send(embed=embed)
-    
-    # ==================== HELP COMMAND ====================
-    
-    @app_commands.command(
-        name="parlay-help",
-        description="Show help information for NBABot commands"
-    )
-    async def help_command(self, interaction: discord.Interaction):
-        """Show help embed."""
-        embed = build_help_embed()
-        await interaction.response.send_message(embed=embed)
-    
-    # ==================== RULES COMMAND ====================
-    
-    @app_commands.command(
-        name="parlay-rules",
-        description="Display eligibility rules for parlay legs"
-    )
-    async def rules_command(self, interaction: discord.Interaction):
-        """Show eligibility rules embed."""
-        embed = build_rules_embed()
-        await interaction.response.send_message(embed=embed)
-    
-    # ==================== STATS COMMAND ====================
-    
-    @app_commands.command(
-        name="parlay-stats",
-        description="Show bot statistics and status"
-    )
-    async def stats_command(self, interaction: discord.Interaction):
-        """Show bot statistics."""
-        embed = discord.Embed(
-            title=f"📊 {BOT_NAME} v{BOT_VERSION} Statistics",
-            color=0x1D428A
-        )
-        
-        # Bot stats
-        embed.add_field(
-            name="🤖 Bot Info",
-            value=(
-                f"**Version:** {BOT_VERSION}\n"
-                f"**Guilds:** {len(self.bot.guilds)}\n"
-                f"**Latency:** {round(self.bot.latency * 1000)}ms"
-            ),
-            inline=True
-        )
-        
-        # Cache stats
-        embed.add_field(
-            name="📦 Cache",
-            value=(
-                f"**Parlays:** {len(parlay_engine._parlay_cache)}\n"
-                f"**Legs:** {len(parlay_engine._leg_cache)}"
-            ),
-            inline=True
-        )
-        
-        # Check today's games
-        try:
-            games = await api_client.get_games_today()
-            games_count = len(games) if games else 0
-        except:
-            games_count = "Error"
-        
-        embed.add_field(
-            name="🏀 Today's Games",
-            value=f"**Available:** {games_count}",
-            inline=True
-        )
-        
-        await interaction.response.send_message(embed=embed)
-    
-    # ==================== ERROR HANDLERS ====================
-    
-    @parlay_command.error
-    async def parlay_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        """Handle parlay command errors."""
-        if isinstance(error, app_commands.CommandOnCooldown):
-            embed = build_error_embed(
-                "Cooldown",
-                f"Please wait {error.retry_after:.1f} seconds before using this command again."
-            )
-        elif isinstance(error, app_commands.MissingPermissions):
-            embed = build_error_embed(
-                "Missing Permissions",
-                "You don't have permission to use this command."
-            )
-        else:
-            logger.error(f"Command error: {error}", exc_info=True)
-            embed = build_error_embed(
-                "Error",
-                "An unexpected error occurred. Please try again."
-            )
-        
-        if interaction.response.is_done():
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        else:
-            await interaction.response.send_message(embed=embed, ephemeral=True)
 
+            parlay_engine._parlay_cache[parlay.id] = parlay
+            for leg in selected:
+                parlay_engine._leg_cache[leg.id] = leg
+
+            embed = build_parlay_embed(parlay)
+            avg_conf = sum(l.confidence.score for l in selected) / len(selected)
+            embed.set_footer(
+                text=f"Avg Confidence: {avg_conf:.0f}/{CONFIDENCE_MAX} | ⚠️ Educational Only"
+            )
+
+            await interaction.followup.send(
+                embed=embed,
+                view=ParlayView(parlay),
+            )
+
+        except Exception:
+            logging.exception("Parlay confidence failed")
+            await interaction.followup.send(
+                "❌ Unexpected error. Please try again later.",
+                ephemeral=True,
+            )
+
+    # ---------- EDGE FINDER ----------
+
+    @app_commands.command(
+        name="edge-finder",
+        description="Find best +odds value plays",
+    )
+    async def edge_finder(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        try:
+            games = await parlay_engine.api.get_games_today()
+            picks = []
+
+            for game in games:
+                legs = await parlay_engine._generate_legs_for_game(game, ladder=5)
+                for leg in legs:
+                    if leg.odds.american <= 0:
+                        continue
+
+                    hit_rate = HitRateData(
+                        hits_l5=leg.hit_rate.hits_l5,
+                        games_l5=leg.hit_rate.games_l5,
+                        hits_l10=leg.hit_rate.hits_l10,
+                        games_l10=leg.hit_rate.games_l10,
+                        hits_l15=leg.hit_rate.hits_l15,
+                        games_l15=leg.hit_rate.games_l15,
+                    )
+
+                    context = ContextData(
+                        minutes_stable=leg.minutes_projection.stable,
+                        is_home=leg.is_home,
+                    )
+
+                    confidence = calculate_confidence(hit_rate, context)
+
+                    if confidence.score >= DEFAULT_MIN_CONFIDENCE:
+                        picks.append(
+                            {"leg": leg, "confidence": confidence.score}
+                        )
+
+            if not picks:
+                await interaction.followup.send("❌ No +odds edges today.", ephemeral=True)
+                return
+
+            picks.sort(key=lambda x: x["confidence"], reverse=True)
+            embed = build_edge_finder_embed_v11(picks[:5])
+            await interaction.followup.send(embed=embed)
+
+        except Exception:
+            logging.exception("Edge finder failed")
+            await interaction.followup.send(
+                "❌ Unexpected error. Please try again later.",
+                ephemeral=True,
+            )
+
+
+# ================= BOT ==================
+
+class NBABot(commands.Bot):
+    def __init__(self):
+        super().__init__(
+            command_prefix="!",
+            intents=discord.Intents.default(),
+        )
+
+    async def setup_hook(self):
+        await self.add_cog(ParlayCog(self))
+        await self.tree.sync()
+
+
+# ================= ENTRY ==================
 
 async def main():
-    """Main entry point."""
-    if not DISCORD_TOKEN:
-        logger.error("DISCORD_TOKEN not found in environment variables!")
-        return
-    
+    verify_v11()
+    verify_player_status_engine()
     bot = NBABot()
-    
-    try:
-        await bot.start(DISCORD_TOKEN)
-    except KeyboardInterrupt:
-        logger.info("Bot shutting down...")
-    finally:
-        await bot.close()
-
+    await bot.start(DISCORD_TOKEN)
 
 if __name__ == "__main__":
     asyncio.run(main())

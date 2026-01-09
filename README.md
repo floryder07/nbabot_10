@@ -1,3 +1,28 @@
+## 📋 Version
+
+**Current:** v11.0.0
+
+See [CHANGELOG.md](CHANGELOG.md) for full version history.
+
+### What's New in v11
+- 💯 Confidence scoring (0-95, never 100%)
+- ⚠️ Caution system (⚠️/⚠️⚠️/❌)
+- 👤 Smarter player prop selection
+- 🆕 Commands: `/pickoftheday`, `/edgefinder`
+```
+
+---
+
+## 3️⃣ Where Update Logs Go
+
+| Log Type | Location |
+|----------|----------|
+| **Version history** | `CHANGELOG.md` (root) ✅ Already created |
+| **Patch notes** | `docs/patches/` (optional) |
+| **Integration docs** | `docs/INTEGRATION_GUIDE.md` |
+| **README summary** | `README.md` (brief version section) |
+
+---
 # 🏀 NBABot_Version 10.0 🤖
 
 **NBA Analytics Discord Bot — Rule-Based Parlay Generator**

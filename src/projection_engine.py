@@ -1,3 +1,7 @@
+V11_SIGNATURE = "projection-engine-v10-legacy"
+
+def _assert_v11():
+    return V11_SIGNATURE
 """
 NBABot v10.1.0 — Projection Engine
 

@@ -1,3 +1,7 @@
+V11_SIGNATURE = "parlay-engine-v10-legacy"
+
+def _assert_v11():
+    return V11_SIGNATURE
 """
 NBABot v10.0 Parlay Engine (FIXED)
 

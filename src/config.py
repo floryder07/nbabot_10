@@ -1,7 +1,8 @@
-"""
-NBABot v10.1.0 Configuration
+# file: config.py
 
-Updated with new data sources: Odds API, StatMuse, NBA API
+"""
+NBABot v11.0.0 Configuration
+Unified + Locked v11 Systems
 """
 
 import os
@@ -10,8 +11,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ============================================
+# BOT METADATA (SINGLE SOURCE OF TRUTH)
+# ============================================
+
+BOT_NAME = "NBABot"
+BOT_VERSION = "11.0.0"
+BOT_COLOR = 0x1D428A  # NBA Blue
+
+# ============================================
 # DISCORD CONFIGURATION
 # ============================================
+
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = os.getenv("DISCORD_GUILD_ID")
 CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
@@ -19,183 +29,185 @@ CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 BOT_USER_ID = os.getenv("DISCORD_BOT_USER_ID")
 
 # ============================================
-# BOT SETTINGS
-# ============================================
-BOT_NAME = "NBABot"
-BOT_VERSION = "10.1.0"
-BOT_COLOR = 0x1D428A  # NBA Blue
-
-# ============================================
-# PRIMARY DATA SOURCES
+# CONFIDENCE SYSTEM (v11 — LOCKED)
 # ============================================
 
-# API-Basketball (API-Sports)
-API_BASKETBALL_KEY = os.getenv("API_BASKETBALL_KEY")
-API_BASKETBALL_BASE_URL = "https://v1.basketball.api-sports.io"
+CONFIDENCE_MAX = 95
+CONFIDENCE_MIN = 0
 
-# The Odds API
-ODDS_API_KEY = os.getenv("ODDS_API_KEY")
-ODDS_API_BASE_URL = "https://api.the-odds-api.com/v4"
-ODDS_API_SPORT = "basketball_nba"
-ODDS_API_REGIONS = "us"  # us, uk, eu, au
-ODDS_API_MARKETS = "h2h,spreads,totals,player_points,player_rebounds,player_assists"
+CONFIDENCE_TIERS = {
+    "safe": {"min": 80, "max": 95, "emoji": "🛡️", "label": "Safe"},
+    "normal": {"min": 60, "max": 79, "emoji": "⚖️", "label": "Normal"},
+    "moonshot": {"min": 40, "max": 59, "emoji": "🚀", "label": "Moonshot"},
+    "high_risk": {"min": 0, "max": 39, "emoji": "⚠️", "label": "High Risk"},
+}
 
-# ============================================
-# SECONDARY DATA SOURCES
-# ============================================
+CONFIDENCE_BASE_SCORES = {
+    (5, 5): 70,
+    (4, 5): 62,
+    (8, 10): 65,
+    (7, 10): 58,
+    (13, 15): 68,
+    (12, 15): 60,
+    (11, 15): 56,
+    (10, 15): 52,
+}
 
-# StatMuse (web-based, no official API)
-STATMUSE_ENABLED = os.getenv("STATMUSE_ENABLED", "false").lower() == "true"
-STATMUSE_BASE_URL = "https://www.statmuse.com/nba"
+CONFIDENCE_POSITIVE_MODIFIERS = {
+    "alt_line_consistency": 5,
+    "minutes_stable": 5,
+    "role_clarity": 4,
+    "favorable_matchup": 4,
+    "h2h_alignment": 3,
+    "home_advantage": 2,
+}
 
-# NBA Official API
-NBA_API_ENABLED = os.getenv("NBA_API_ENABLED", "true").lower() == "true"
-NBA_API_BASE_URL = "https://stats.nba.com/stats"
-
-# ============================================
-# DATA SOURCE PRIORITY (Fallback Order)
-# ============================================
-# 1 = highest priority, used first
-DATA_SOURCE_PRIORITY = {
-    "odds_api": 1,        # Best for lines/odds
-    "api_basketball": 2,  # Best for stats/games
-    "nba_api": 3,         # Reference data
-    "statmuse": 4,        # Validation
-    "derived": 5          # Fallback calculations
+CONFIDENCE_NEGATIVE_MODIFIERS = {
+    "questionable_doubtful": -6,
+    "one_low_minute_game": -7,
+    "two_low_minute_games": -12,
+    "role_shift_conflict": -6,
+    "key_teammate_missing": -5,
+    "road_disadvantage": -2,
 }
 
 # ============================================
-# ELIGIBILITY THRESHOLDS
+# PLAYER PROP SYSTEM (v11 — LOCKED)
 # ============================================
-ELIGIBILITY_THRESHOLDS = {
-    5: 3,   # Need 3+ out of 5
-    10: 7,  # Need 7+ out of 10
-    15: 10  # Need 10+ out of 15
-}
 
-VALID_LADDERS = [5, 10, 15]
-DEFAULT_LADDER = 5
-
-# ============================================
-# PARLAY SETTINGS
-# ============================================
-MIN_LEGS = 2
-MAX_LEGS = 10
-MIN_WAGER = 1
-MAX_WAGER = 10000
-
-# ============================================
-# PROJECTION SETTINGS (v10.1.0)
-# ============================================
-# Minimum hit rates for recommendation
-MIN_HIT_RATE_L5 = 0.80   # 4/5 (80%)
-MIN_HIT_RATE_L10 = 0.70  # 7/10 (70%)
-MIN_HIT_RATE_L15 = 0.67  # 10/15 (67%)
-
-# Confidence thresholds
-HIGH_CONFIDENCE = 80
-MEDIUM_CONFIDENCE = 60
-LOW_CONFIDENCE = 40
-
-# ============================================
-# PROP TYPES
-# ============================================
-PROP_TYPES = [
+PLAYER_PROP_MARKETS = [
     "points",
-    "rebounds", 
+    "rebounds",
     "assists",
-    "threes",
+    "pra",
+    "points_rebounds",
+    "points_assists",
+    "rebounds_assists",
     "steals",
     "blocks",
-    "pts_reb_ast"
+    "threes",
+    "double_double",
+    "triple_double",
+    "first_quarter_points",
+    "first_half_points",
 ]
 
-# ============================================
-# LEG TYPES
-# ============================================
-LEG_TYPES = [
-    "player_prop",
-    "moneyline",
-    "spread",
-    "game_total",
-    "team_total"
-]
+PLAYER_PROP_THRESHOLDS = {
+    5: {"min_hits": 4, "min_pct": 0.80},
+    10: {"min_hits": 7, "min_pct": 0.70},
+    15: {"min_hits": 10, "min_pct": 0.67},
+}
+
+ALT_LINE_THRESHOLDS = {
+    "l5_min": 0.60,
+    "l10_min": 0.65,
+    "l15_min": 0.65,
+}
+
+ODDS_CONSTRAINT_MIN = -250
+ODDS_CONSTRAINT_MAX = 180
 
 # ============================================
-# H2H SETTINGS
+# MINUTES & STATUS SYSTEM (v11 — LOCKED)
 # ============================================
-H2H_WINDOW_YEARS = 1
+
+LOW_MINUTES_THRESHOLD = 0.75
+EXCLUDE_LOW_MINUTE_STREAK = 3
+
+STATUS_ELIGIBILITY = {
+    "active": True,
+    "probable": True,
+    "questionable": True,
+    "doubtful": False,
+    "out": False,
+    "suspended": False,
+}
 
 # ============================================
-# DISPLAY SETTINGS
+# CAUTION SYSTEM (v11 — LOCKED)
 # ============================================
+
+CAUTION_ICONS = {
+    "none": "",
+    "mild": "⚠️",
+    "high": "⚠️⚠️",
+    "excluded": "❌",
+}
+
+CAUTION_TRIGGERS = {
+    "questionable": {"level": 1, "message": "Listed as Questionable"},
+    "doubtful": {"level": 2, "message": "Listed as Doubtful"},
+    "minutes_drop": {"level": 1, "message": "Minutes dropped in last game"},
+    "minutes_volatility": {"level": 2, "message": "Minutes volatility detected"},
+    "role_shift": {"level": 1, "message": "Role shift detected"},
+    "teammate_out": {"level": 1, "message": "Key teammate missing"},
+    "star_out": {"level": 2, "message": "Star player ruled OUT"},
+    "back_to_back": {"level": 1, "message": "Back-to-back game"},
+    "blowout_risk": {"level": 1, "message": "Blowout risk"},
+    "large_spread": {"level": 1, "message": "Large spread"},
+    "road_game": {"level": 1, "message": "Road disadvantage"},
+}
+
+# ============================================
+# DISPLAY SETTINGS (v11)
+# ============================================
+
+LEG_TYPE_EMOJIS = {
+    "player_prop": "👤",
+    "moneyline": "🏆",
+    "spread": "📈",
+    "game_total": "📊",
+    "team_total": "📊",
+}
+
+CONFIDENCE_DISPLAY_FORMAT = "{score} / {max} ({emoji} {label})"
+EMBED_SEPARATOR = "━━━━━━━━━━━━━━━━━━━━━━"
 EMBED_FOOTER = f"{BOT_NAME} v{BOT_VERSION} | Educational Analytics Only"
 DISCLAIMER = "⚠️ Educational analytics only. No betting advice."
 
 # ============================================
-# RATE LIMITING
+# COMMAND SETTINGS (v11)
 # ============================================
-API_BASKETBALL_RATE_LIMIT = int(os.getenv("API_BASKETBALL_RATE_LIMIT", "10"))
-ODDS_API_RATE_LIMIT = int(os.getenv("ODDS_API_RATE_LIMIT", "500"))
-API_CACHE_TTL_SECONDS = 300  # 5 minutes
+
+POTD_MAX_PICKS = 5
+POTD_MIN_CONFIDENCE = 70
+
+EDGE_FINDER_MIN_ODDS = 100
+EDGE_FINDER_MIN_CONFIDENCE = 60
+
+# ============================================
+# DATA SOURCES
+# ============================================
+
+API_BASKETBALL_KEY = os.getenv("API_BASKETBALL_KEY")
+ODDS_API_KEY = os.getenv("ODDS_API_KEY")
+
+STATMUSE_ENABLED = os.getenv("STATMUSE_ENABLED", "false").lower() == "true"
+NBA_API_ENABLED = os.getenv("NBA_API_ENABLED", "true").lower() == "true"
 
 # ============================================
 # RUNTIME
 # ============================================
+
 MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() == "true"
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-
 # ============================================
-# HELPER FUNCTIONS
+# VALIDATION
 # ============================================
-
-def is_production() -> bool:
-    """Check if running in production."""
-    return ENVIRONMENT == "production"
-
-
-def get_active_data_sources() -> list:
-    """Get list of active/configured data sources."""
-    sources = []
-    
-    if API_BASKETBALL_KEY:
-        sources.append("api_basketball")
-    
-    if ODDS_API_KEY:
-        sources.append("odds_api")
-    
-    if NBA_API_ENABLED:
-        sources.append("nba_api")
-    
-    if STATMUSE_ENABLED:
-        sources.append("statmuse")
-    
-    if MOCK_MODE:
-        sources.append("mock")
-    
-    return sources
-
 
 def validate_config() -> dict:
-    """Validate configuration and return status."""
-    status = {
-        "valid": True,
-        "errors": [],
-        "warnings": []
-    }
-    
-    # Required
+    status = {"valid": True, "errors": [], "warnings": []}
+
     if not DISCORD_TOKEN:
         status["valid"] = False
         status["errors"].append("DISCORD_TOKEN is missing")
-    
-    # Recommended
+
     if not API_BASKETBALL_KEY and not MOCK_MODE:
-        status["warnings"].append("API_BASKETBALL_KEY missing - enable MOCK_MODE for testing")
-    
+        status["warnings"].append("API_BASKETBALL_KEY missing (enable MOCK_MODE)")
+
     if not ODDS_API_KEY:
-        status["warnings"].append("ODDS_API_KEY missing - alt lines won't be available")
-    
+        status["warnings"].append("ODDS_API_KEY missing (odds limited)")
+
     return status

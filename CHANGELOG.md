@@ -1,3 +1,35 @@
+#
+# ---
+#
+## [11.0.0] - 2026-01-09
+
+### 🎉 Major Release: NBABot v11 Slash Commands & Engine Upgrades
+
+#### ✨ New Features
+
+**Slash Commands (v11 additions)**
+- `/pickoftheday` — Top 5 highest confidence picks, ranked (min confidence: 70)
+- `/edgefinder` — Value picks with +odds only (min confidence: 60)
+- `/parlay-confidence` — Parlay builder with minimum confidence filter
+- `/parlay-rules-v11` — Updated rules and confidence system display
+
+**Confidence & Caution System Enhancements**
+- Confidence scoring system (max 95, never 100%)
+- Confidence tiers: Safe, Normal, Moonshot, High Risk
+- Universal caution system: ⚠️, ⚠️⚠️, ❌
+- Stricter player prop eligibility (L5=80%, L10=70%, L15=67%)
+- Player status & minutes filter improvements
+
+#### 🆕 New Files
+- `src/confidence_engine.py` — Confidence scoring
+- `src/caution_engine.py` — Caution detection
+- `src/player_status.py` — Player status & minutes filter
+
+#### 📊 Updated Discord Output
+- Enhanced embed formatting for picks, confidence, and cautions
+- New command outputs for v11 features
+
+---
 # 📋 Changelog
 
 All notable changes to NBABot will be documented in this file.
