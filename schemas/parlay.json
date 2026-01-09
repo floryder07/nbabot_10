@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Parlay",
+  "description": "NBABot v10.0 Parlay Schema",
+  "type": "object",
+  "required": ["id", "legs", "wager", "ladder", "total_odds", "potential_win", "created_at"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique parlay identifier",
+      "pattern": "^parlay_[a-z0-9]{12}$"
+    },
+    "legs": {
+      "type": "array",
+      "description": "Array of parlay legs",
+      "minItems": 2,
+      "maxItems": 10,
+      "items": {
+        "$ref": "leg.json"
+      }
+    },
+    "leg_count": {
+      "type": "integer",
+      "description": "Number of legs in parlay",
+      "minimum": 2,
+      "maximum": 10
+    },
+    "wager": {
+      "type": "number",
+      "description": "Wager amount in USD",
+      "minimum": 0.01
+    },
+    "ladder": {
+      "type": "integer",
+      "description": "Historical game window",
+      "enum": [5, 10, 15]
+    },
+    "total_odds": {
+      "type": "integer",
+      "description": "Combined American odds (e.g., +1180)"
+    },
+    "total_odds_decimal": {
+      "type": "number",
+      "description": "Combined decimal odds"
+    },
+    "potential_win": {
+      "type": "number",
+      "description": "Potential payout in USD"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of parlay creation"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "Discord user ID who requested the parlay"
+    },
+    "guild_id": {
+      "type": "string",
+      "description": "Discord server ID"
+    },
+    "channel_id": {
+      "type": "string",
+      "description": "Discord channel ID"
+    }
+  },
+  "additionalProperties": false
+}

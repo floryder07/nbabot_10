@@ -1,0 +1,192 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Leg",
+  "description": "NBABot v10.0 Parlay Leg Schema",
+  "type": "object",
+  "required": ["id", "type", "matchup", "selection", "odds", "hit_rate", "eligible"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique leg identifier",
+      "pattern": "^leg_[a-z0-9]{8}$"
+    },
+    "type": {
+      "type": "string",
+      "description": "Type of bet",
+      "enum": ["player_prop", "moneyline", "spread", "game_total", "team_total"]
+    },
+    "matchup": {
+      "type": "object",
+      "description": "Game matchup information",
+      "required": ["home_team", "away_team", "game_id"],
+      "properties": {
+        "home_team": {
+          "type": "string",
+          "description": "Home team name"
+        },
+        "away_team": {
+          "type": "string",
+          "description": "Away team name"
+        },
+        "game_id": {
+          "type": "string",
+          "description": "API game identifier"
+        },
+        "game_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Game date"
+        },
+        "game_time": {
+          "type": "string",
+          "description": "Game start time"
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "description": "The actual pick/selection",
+      "required": ["label", "value"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Display label (e.g., 'LeBron James — Over 25.5 Points')"
+        },
+        "value": {
+          "type": "number",
+          "description": "Line value (e.g., 25.5)"
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["over", "under", "win", "cover"],
+          "description": "Bet direction"
+        },
+        "player_name": {
+          "type": "string",
+          "description": "Player name (for player props)"
+        },
+        "player_id": {
+          "type": "string",
+          "description": "API player identifier"
+        },
+        "team_name": {
+          "type": "string",
+          "description": "Team name (for team bets)"
+        },
+        "team_id": {
+          "type": "string",
+          "description": "API team identifier"
+        },
+        "prop_type": {
+          "type": "string",
+          "enum": ["points", "rebounds", "assists", "threes", "steals", "blocks", "pts_reb_ast"],
+          "description": "Type of player prop"
+        }
+      }
+    },
+    "odds": {
+      "type": "object",
+      "description": "Betting odds",
+      "required": ["american"],
+      "properties": {
+        "american": {
+          "type": "integer",
+          "description": "American odds (e.g., -110, +150)"
+        },
+        "decimal": {
+          "type": "number",
+          "description": "Decimal odds (e.g., 1.91)"
+        },
+        "implied_probability": {
+          "type": "number",
+          "description": "Implied probability percentage",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "hit_rate": {
+      "type": "object",
+      "description": "Historical hit rate data",
+      "required": ["hits", "games", "ladder"],
+      "properties": {
+        "hits": {
+          "type": "integer",
+          "description": "Number of times this hit",
+          "minimum": 0
+        },
+        "games": {
+          "type": "integer",
+          "description": "Total games in sample",
+          "enum": [5, 10, 15]
+        },
+        "ladder": {
+          "type": "integer",
+          "description": "Ladder window used",
+          "enum": [5, 10, 15]
+        },
+        "percentage": {
+          "type": "number",
+          "description": "Hit rate percentage",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "h2h": {
+      "type": "object",
+      "description": "Head-to-head data (team bets only)",
+      "properties": {
+        "wins": {
+          "type": "integer",
+          "description": "H2H wins",
+          "minimum": 0
+        },
+        "games": {
+          "type": "integer",
+          "description": "H2H games played",
+          "minimum": 0
+        },
+        "window": {
+          "type": "string",
+          "description": "H2H time window",
+          "enum": ["1_year"]
+        }
+      }
+    },
+    "spread_data": {
+      "type": "object",
+      "description": "Spread-specific data",
+      "properties": {
+        "spread_value": {
+          "type": "number",
+          "description": "Spread line (e.g., -7.5)"
+        },
+        "avg_margin": {
+          "type": "number",
+          "description": "Average margin of victory"
+        },
+        "cover_rate": {
+          "type": "object",
+          "properties": {
+            "covers": {
+              "type": "integer"
+            },
+            "games": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "eligible": {
+      "type": "boolean",
+      "description": "Whether leg passes eligibility rules"
+    },
+    "rejection_reason": {
+      "type": "string",
+      "description": "Reason for rejection if not eligible"
+    }
+  },
+  "additionalProperties": false
+}
