@@ -279,3 +279,100 @@ MIT License — see [LICENSE](LICENSE) for details.
 ---
 
 **Built with 🏀 for NBA analytics enthusiasts**
+---
+
+## 1️⃣ UPDATE THE VERSION BADGE (at the top)
+
+Change:
+```
+# 🏀 NBABot_Version 10.0 🤖
+```
+
+To:
+```
+# 🏀 NBABot v10.0.1 🤖
+
+[![Version](https://img.shields.io/badge/version-10.0.1-blue.svg)](CHANGELOG.md)
+[![Status](https://img.shields.io/badge/status-active-success.svg)]()
+```
+
+---
+
+## 2️⃣ ADD VERSION HISTORY SECTION (before Contributing section)
+
+```markdown
+---
+
+## 📋 Version History
+
+See [CHANGELOG.md](CHANGELOG.md) for full version history.
+
+### Latest: v10.0.1 (Jan 8, 2025)
+**Fixes:**
+- ✅ Odds now display correctly (American format with implied probability)
+- ✅ Button interactions fixed (no more "Interaction Failed")
+- ✅ Refresh button edits message properly
+- ✅ Insights vs Explain now have distinct purposes
+
+### Previous: v10.0.0 (Jan 8, 2025)
+- 🎉 Initial release with rule-based parlay generation
+
+---
+```
+
+---
+
+## 3️⃣ UPDATE THE CONFIG SECTION
+
+Add version info to your config.py:
+
+```python
+# Bot Settings
+BOT_NAME = "NBABot"
+BOT_VERSION = "10.0.1"  # ← Update this with each patch
+```
+
+---
+
+## 📁 WHERE TO PUT FILES
+
+```
+nbabot_v10/
+├── CHANGELOG.md        ← NEW FILE (put in root)
+├── README.md           ← UPDATE existing
+├── docs/
+│   └── PSEUDOCODE.md
+├── schemas/
+│   ├── parlay.json
+│   └── leg.json
+├── src/
+│   ├── bot.py
+│   ├── buttons.py      ← REPLACED
+│   ├── embeds.py       ← REPLACED
+│   ├── parlay_engine.py ← REPLACED
+│   ├── config.py       ← UPDATE version
+│   └── ...
+└── ...
+```
+
+---
+
+## 🏷️ VERSION NUMBERING
+
+Use Semantic Versioning (SemVer):
+
+```
+MAJOR.MINOR.PATCH
+
+10.0.0 → Initial release
+10.0.1 → Bug fixes (current)
+10.1.0 → New features (future)
+11.0.0 → Major changes / AI mode (future)
+```
+
+| Change Type | Version Bump | Example |
+|-------------|--------------|---------|
+| Bug fix | PATCH | 10.0.0 → 10.0.1 |
+| New feature | MINOR | 10.0.1 → 10.1.0 |
+| Breaking change | MAJOR | 10.1.0 → 11.0.0 |
+
